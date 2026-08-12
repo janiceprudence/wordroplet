@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "dev": "py -m http.server 4173",
+    "build": "py scripts/validate-static.py"
+  }
+}
