@@ -1,496 +1,313 @@
 (() => {
-  const host = document.querySelector("#canvas-host");
-  const controls = {
-    gravity: document.querySelector("#gravity-control"),
-    frequency: document.querySelector("#frequency-control"),
-    size: document.querySelector("#size-control"),
-    bounce: document.querySelector("#bounce-control"),
-    deform: document.querySelector("#deform-control"),
-    drift: document.querySelector("#drift-control"),
-    ripple: document.querySelector("#ripple-control"),
-    colorMode: document.querySelector("#color-control"),
-    phrase: document.querySelector("#phrase-input"),
-    pause: document.querySelector("#pause-button"),
-    reset: document.querySelector("#reset-button"),
-    rain: document.querySelector("#rain-button"),
-    save: document.querySelector("#save-button"),
-    panelToggle: document.querySelector("#panel-toggle"),
-    panel: document.querySelector(".control-shell"),
-  };
-  const status = {
-    state: document.querySelector("#status-state"),
-    count: document.querySelector("#status-count"),
-    time: document.querySelector("#status-time"),
+  const container = document.querySelector("#container");
+  if (!container || !window.p5) return;
+
+  const PHRASES = ["水滴石穿", "雲雨成河", "潮生墨流", "霧散風過", "露凝空明", "雨落成波"];
+  const CONFIG = {
+    damping: 0.985,
+    gravity: 0.34,
+    iterations: 5,
+    pullRadius: 92,
+    clickRadius: 150,
   };
 
-  if (!host || !window.p5) return;
-
-  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const defaultCharacters = Array.from("水雨云雾河海潮流滴落风波泉露墨静空");
-  const palettes = {
-    ink: { text: "#151412", accent: "#b42f20", splash: "#1e1d1a", glow: "#b42f20" },
-    cinnabar: { text: "#7b1d13", accent: "#c43a26", splash: "#b42f20", glow: "#f05a3f" },
-    jade: { text: "#153e35", accent: "#007f66", splash: "#1c7b68", glow: "#00a987" },
-    blue: { text: "#10182f", accent: "#1357ff", splash: "#174de0", glow: "#3a74ff" },
-  };
-
-  let sketchApi;
-
-  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-  const easeOutCubic = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
-  const easeInOutSine = (t) => -(Math.cos(Math.PI * clamp(t, 0, 1)) - 1) / 2;
-
-  function settings() {
-    const reduced = reducedMotionQuery.matches;
-    return {
-      gravity: Number(controls.gravity.value),
-      frequency: reduced ? 0.08 : Number(controls.frequency.value),
-      size: Number(controls.size.value) * (window.innerWidth < 700 ? 0.74 : 1),
-      bounce: Number(controls.bounce.value),
-      deform: reduced ? Number(controls.deform.value) * 0.35 : Number(controls.deform.value),
-      drift: reduced ? Number(controls.drift.value) * 0.18 : Number(controls.drift.value),
-      ripple: reduced ? Number(controls.ripple.value) * 0.28 : Number(controls.ripple.value),
-      palette: palettes[controls.colorMode.value] || palettes.ink,
-      maxDrops: window.innerWidth < 700 ? 18 : 34,
-      maxSplash: window.innerWidth < 700 ? 90 : 180,
-      reduced,
-    };
-  }
-
-  function phraseCharacters() {
-    const clean = Array.from(controls.phrase.value)
-      .filter((char) => /[\u3400-\u9fff]/u.test(char))
-      .slice(0, 24);
-    return clean.length ? clean : defaultCharacters;
-  }
-
-  class LiquidSurface {
-    constructor(p) {
-      this.p = p;
-      this.points = [];
-      this.resize();
-    }
-
-    resize() {
-      const count = Math.max(34, Math.floor(this.p.width / 28));
-      this.y = this.p.height * 0.64;
-      this.points = Array.from({ length: count }, (_, index) => ({
-        x: (index / (count - 1)) * this.p.width,
-        y: 0,
-        velocity: 0,
-      }));
-    }
-
-    disturb(x, force) {
-      this.points.forEach((point) => {
-        const distance = Math.abs(point.x - x);
-        const falloff = Math.max(0, 1 - distance / 180);
-        point.velocity += force * falloff;
-      });
-    }
-
-    update(dt) {
-      const tension = 36;
-      const damping = 0.82;
-      this.points.forEach((point) => {
-        point.velocity += -point.y * tension * dt;
-        point.velocity *= Math.pow(damping, dt * 60);
-        point.y += point.velocity * dt;
-      });
-    }
-
-    displacementAt(x) {
-      if (!this.points.length) return 0;
-      const step = this.p.width / (this.points.length - 1);
-      const raw = clamp(x / step, 0, this.points.length - 1);
-      const left = Math.floor(raw);
-      const right = Math.min(this.points.length - 1, left + 1);
-      const t = raw - left;
-      return this.p.lerp(this.points[left].y, this.points[right].y, t);
-    }
-
-    draw(palette) {
-      const p = this.p;
-      p.noFill();
-      p.strokeWeight(1.2);
-      p.stroke(p.color(palette.accent + "99"));
-      p.beginShape();
-      this.points.forEach((point) => p.curveVertex(point.x, this.y + point.y));
-      p.endShape();
-      p.stroke(p.color(palette.accent + "22"));
-      p.line(0, this.y + 8, p.width, this.y + 8);
-    }
-  }
-
-  class SplashParticle {
-    constructor() {
-      this.dead = true;
-    }
-
-    reset(p, x, y, palette, force = 1) {
-      const angle = p.random(-Math.PI * 0.92, -Math.PI * 0.08);
-      const speed = p.random(70, 320) * force;
+  class Point {
+    constructor(x, y, char, pinned = false) {
       this.x = x;
       this.y = y;
-      this.vx = Math.cos(angle) * speed + p.random(-60, 60);
-      this.vy = Math.sin(angle) * speed;
-      this.size = p.random(2, 9) * force;
-      this.life = p.random(0.55, 1.25);
-      this.age = 0;
-      this.color = palette.splash;
-      this.dead = false;
+      this.oldX = x;
+      this.oldY = y;
+      this.char = char;
+      this.pinned = pinned;
+      this.homeX = x;
+      this.homeY = y;
+      this.fx = 0;
+      this.fy = 0;
     }
 
-    update(dt, gravity) {
-      if (this.dead) return;
-      this.age += dt;
-      this.vy += gravity * 0.55 * dt;
-      this.x += this.vx * dt;
-      this.y += this.vy * dt;
-      if (this.age > this.life) this.dead = true;
+    addForce(x, y) {
+      this.fx += x;
+      this.fy += y;
     }
 
-    draw(p) {
-      if (this.dead) return;
-      const fade = 1 - this.age / this.life;
-      const c = p.color(this.color);
-      c.setAlpha(190 * fade);
-      p.noStroke();
-      p.fill(c);
-      p.circle(this.x, this.y, this.size * (0.65 + fade));
+    update() {
+      if (this.pinned) {
+        this.fx = 0;
+        this.fy = 0;
+        return;
+      }
+
+      const vx = (this.x - this.oldX) * CONFIG.damping;
+      const vy = (this.y - this.oldY) * CONFIG.damping;
+      this.oldX = this.x;
+      this.oldY = this.y;
+      this.x += vx + this.fx;
+      this.y += vy + this.fy + CONFIG.gravity;
+      this.fx = 0;
+      this.fy = 0;
     }
   }
 
-  class CharacterDrop {
-    constructor(p, surface, getCharacters) {
-      this.p = p;
-      this.surface = surface;
-      this.getCharacters = getCharacters;
-      this.dead = true;
+  class Link {
+    constructor(a, b, length, stiffness = 1) {
+      this.a = a;
+      this.b = b;
+      this.length = length;
+      this.stiffness = stiffness;
     }
 
-    reset(x, y, options = {}) {
-      const p = this.p;
-      const config = settings();
-      const chars = this.getCharacters();
-      this.char = chars[Math.floor(p.random(chars.length))];
-      this.x = x ?? p.random(p.width * 0.18, p.width * 0.88);
-      this.y = y ?? p.random(-p.height * 0.38, -40);
-      this.vx = p.random(-18, 18);
-      this.vy = options.fast ? p.random(80, 190) : p.random(20, 90);
-      this.ax = 0;
-      this.rotation = p.random(-0.12, 0.12);
-      this.angularVelocity = p.random(-0.42, 0.42);
-      this.baseSize = options.size ?? p.random(config.size * 0.78, config.size * 1.22);
-      this.scaleX = 1;
-      this.scaleY = 1;
-      this.opacity = 255;
-      this.state = "SPAWNING";
-      this.age = 0;
-      this.impactAge = 0;
-      this.noiseSeed = p.random(1000);
-      this.smear = p.random(26, 82);
-      this.dead = false;
-      this.splashMade = false;
-      this.color = options.color || config.palette.text;
-    }
-
-    update(dt, config, onImpact) {
-      if (this.dead) return;
-      const p = this.p;
-      this.age += dt;
-      const surfaceY = this.surface.y + this.surface.displacementAt(this.x);
-      const distance = surfaceY - this.y;
-
-      if (this.state === "SPAWNING" && this.age > 0.08) this.state = "FALLING";
-      if (this.state === "FALLING" && distance < this.baseSize * 1.1) this.state = "APPROACHING";
-
-      if (["SPAWNING", "FALLING", "APPROACHING"].includes(this.state)) {
-        const drift = (p.noise(this.noiseSeed, this.age * 0.42) - 0.5) * config.drift;
-        this.ax = drift;
-        this.vx += this.ax * dt;
-        this.vy += config.gravity * dt;
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-        this.rotation += this.angularVelocity * dt;
-
-        if (this.state === "APPROACHING") {
-          const pull = 1 - clamp(distance / (this.baseSize * 1.1), 0, 1);
-          this.scaleY = 1 + pull * 0.45 * config.deform;
-          this.scaleX = 1 - pull * 0.16 * config.deform;
-        }
-
-        if (this.y + this.baseSize * 0.34 >= surfaceY) {
-          this.state = "IMPACT";
-          this.impactAge = 0;
-          this.y = surfaceY - this.baseSize * 0.22;
-          this.vy = -Math.abs(this.vy) * config.bounce;
-          this.surface.disturb(this.x, Math.min(70, this.baseSize * 0.62) * config.ripple);
-          onImpact(this);
-        }
-      } else {
-        this.impactAge += dt;
-        const t = this.impactAge;
-        if (this.state === "IMPACT") {
-          const squash = easeOutCubic(Math.min(1, t / 0.16));
-          this.scaleX = 1 + 0.72 * squash * config.deform;
-          this.scaleY = 1 - 0.46 * squash * config.deform;
-          if (t > 0.16) this.state = "LIQUID";
-        } else if (this.state === "LIQUID") {
-          const recoil = easeInOutSine(Math.min(1, t / 0.48));
-          this.x += this.vx * 0.22 * dt;
-          this.y += this.vy * dt + 32 * dt;
-          this.vy += config.gravity * 0.58 * dt;
-          this.scaleX = 1.72 - recoil * 0.42;
-          this.scaleY = 0.54 + recoil * 0.38;
-          this.opacity = 255 * (1 - clamp((t - 0.18) / 0.82, 0, 1));
-          if (t > 0.58) this.state = "DISSOLVING";
-        } else if (this.state === "DISSOLVING") {
-          this.y += (70 + Math.abs(this.vy) * 0.3) * dt;
-          this.x += Math.sin(this.age * 4) * 12 * dt;
-          this.scaleX += 0.55 * dt;
-          this.scaleY = Math.max(0.08, this.scaleY - 0.5 * dt);
-          this.opacity -= 210 * dt;
-          if (this.opacity <= 0 || this.y > p.height + this.baseSize) this.dead = true;
-        }
+    solve() {
+      const dx = this.b.x - this.a.x;
+      const dy = this.b.y - this.a.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const diff = (distance - this.length) / distance;
+      const ox = dx * diff * 0.5 * this.stiffness;
+      const oy = dy * diff * 0.5 * this.stiffness;
+      if (!this.a.pinned) {
+        this.a.x += ox;
+        this.a.y += oy;
       }
-
-      if (this.x < -this.baseSize || this.x > p.width + this.baseSize || this.y > p.height + this.baseSize * 2) {
-        this.dead = true;
+      if (!this.b.pinned) {
+        this.b.x -= ox;
+        this.b.y -= oy;
       }
-    }
-
-    draw(p, palette) {
-      if (this.dead) return;
-      p.push();
-      p.translate(this.x, this.y);
-      p.rotate(this.rotation);
-      p.scale(this.scaleX, this.scaleY);
-      p.textAlign(p.CENTER, p.CENTER);
-      p.textSize(this.baseSize);
-      p.textFont("Noto Serif SC, Source Han Serif SC, Songti SC, SimSun, serif");
-
-      if (this.state === "LIQUID" || this.state === "DISSOLVING") {
-        const smearAlpha = clamp(this.opacity * 0.32, 0, 80);
-        const smear = p.color(palette.accent);
-        smear.setAlpha(smearAlpha);
-        p.noStroke();
-        p.fill(smear);
-        p.ellipse(0, this.baseSize * 0.2, this.smear * this.scaleX, this.baseSize * 0.18);
-      }
-
-      const ink = p.color(this.color);
-      ink.setAlpha(clamp(this.opacity, 0, 255));
-      p.fill(ink);
-      p.noStroke();
-      p.text(this.char, 0, 0);
-      p.pop();
     }
   }
 
   new p5((p) => {
-    let surface;
-    let drops = [];
-    let splashes = [];
-    let lastTime = 0;
-    let spawnClock = 0;
-    let running = true;
-    let hiddenPause = false;
-    let startTime = 0;
-    let lastState = "FALLING";
+    let points = [];
+    let links = [];
+    let grabbed = null;
+    let spacing = 0;
+    let fontSize = 0;
+    let surfaceY = 0;
+    let droplet;
+    let resetHitArea = { x: 14, y: 0, w: 52, h: 18 };
 
-    function createDrop(x, y, options) {
-      const config = settings();
-      let drop = drops.find((candidate) => candidate.dead);
-      if (!drop && drops.length < config.maxDrops) {
-        drop = new CharacterDrop(p, surface, phraseCharacters);
-        drops.push(drop);
-      }
-      if (drop) drop.reset(x, y, options);
+    function sizeCanvas() {
+      return Math.max(300, Math.min(520, window.innerWidth - 42, window.innerHeight - 42));
     }
 
-    function createSplash(x, y, force = 1) {
-      const config = settings();
-      surface.disturb(x, -44 * config.ripple * force);
-      const count = config.reduced ? 3 : Math.floor(p.random(7, 15) * force);
-      for (let i = 0; i < count; i += 1) {
-        let particle = splashes.find((candidate) => candidate.dead);
-        if (!particle && splashes.length < config.maxSplash) {
-          particle = new SplashParticle();
-          splashes.push(particle);
+    function halfWidthAt(y) {
+      const t = Math.max(0, Math.min(1, (y - droplet.top) / droplet.height));
+      const taper = Math.pow(Math.sin(t * Math.PI), 0.52);
+      const bulb = 0.26 + 1.55 * t - 0.72 * t * t;
+      return droplet.maxHalf * taper * bulb;
+    }
+
+    function clampToDroplet(point) {
+      const margin = fontSize * 0.55;
+      point.y = Math.max(droplet.top + margin, Math.min(droplet.bottom - margin, point.y));
+      const half = Math.max(2, halfWidthAt(point.y) - margin);
+      point.x = Math.max(droplet.cx - half, Math.min(droplet.cx + half, point.x));
+    }
+
+    function buildMesh() {
+      points = [];
+      links = [];
+      const width = p.width;
+      const height = p.height;
+      droplet = {
+        cx: width / 2,
+        top: height * 0.12,
+        bottom: height * 0.86,
+        height: height * 0.74,
+        maxHalf: width * 0.34,
+      };
+      spacing = Math.max(22, Math.min(32, width / 16));
+      fontSize = spacing * 0.78;
+      surfaceY = height * 0.68;
+      const text = PHRASES.join("");
+      const rows = Math.floor((droplet.bottom - droplet.top - fontSize) / (spacing * 0.72));
+      const rowPoints = [];
+
+      for (let row = 0; row < rows; row += 1) {
+        const y = droplet.top + fontSize * 0.62 + row * spacing * 0.72;
+        const half = halfWidthAt(y) - fontSize * 0.62;
+        const cols = Math.max(1, Math.floor((half * 2) / spacing) + 1);
+        const usable = Math.max(0, (cols - 1) * spacing);
+        const startX = droplet.cx - usable / 2;
+        const rowList = [];
+        for (let col = 0; col < cols; col += 1) {
+          const wobble = row % 2 ? spacing * 0.22 : 0;
+          let x = startX + col * spacing + wobble;
+          const allowedHalf = halfWidthAt(y) - fontSize * 0.62;
+          x = Math.max(droplet.cx - allowedHalf, Math.min(droplet.cx + allowedHalf, x));
+          const index = (col + row * 3 + Math.floor(row / 2)) % text.length;
+          const point = new Point(x, y, text[index], row === 0);
+          rowList.push(point);
+          points.push(point);
         }
-        if (particle) particle.reset(p, x + p.random(-12, 12), y + p.random(-4, 4), config.palette, force);
+        rowPoints.push(rowList);
       }
+
+      rowPoints.forEach((rowList, row) => {
+        rowList.forEach((current, col) => {
+          if (col < rowList.length - 1) {
+            links.push(new Link(current, rowList[col + 1], Math.abs(rowList[col + 1].x - current.x), 0.75));
+          }
+          const nextRow = rowPoints[row + 1];
+          if (!nextRow) return;
+          const nearest = [...nextRow].sort((a, b) => Math.abs(a.x - current.x) - Math.abs(b.x - current.x)).slice(0, 2);
+          nearest.forEach((next) => links.push(new Link(current, next, Math.hypot(next.x - current.x, next.y - current.y), 0.72)));
+        });
+      });
     }
 
-    function rain(count = 12) {
-      const config = settings();
-      const total = config.reduced ? Math.min(4, count) : count;
-      for (let i = 0; i < total; i += 1) {
-        createDrop(p.random(p.width * 0.12, p.width * 0.9), p.random(-p.height * 0.55, -24), { fast: true });
+    function applyPointerForce(x, y, radius, strength) {
+      points.forEach((point) => {
+        const dx = point.x - x;
+        const dy = point.y - y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > radius || distance < 1) return;
+        const power = (1 - distance / radius) * strength;
+        point.addForce((dx / distance) * power, (dy / distance) * power);
+      });
+    }
+
+    function nearestPoint(x, y) {
+      let best = null;
+      let bestDistance = 28;
+      points.forEach((point) => {
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance < bestDistance) {
+          best = point;
+          bestDistance = distance;
+        }
+      });
+      return best;
+    }
+
+    function drawSurface() {
+      p.stroke("#2f8f9a");
+      p.strokeWeight(1);
+      p.line(0, surfaceY, p.width, surfaceY);
+      p.stroke("#2f8f9a36");
+      p.line(0, surfaceY + 7, p.width, surfaceY + 7);
+    }
+
+    function drawDropletGuide() {
+      p.noFill();
+      p.stroke("#2f8f9a24");
+      p.strokeWeight(1);
+      p.beginShape();
+      for (let i = 0; i <= 72; i += 1) {
+        const y = droplet.top + (i / 72) * droplet.height;
+        p.vertex(droplet.cx - halfWidthAt(y), y);
       }
+      for (let i = 72; i >= 0; i -= 1) {
+        const y = droplet.top + (i / 72) * droplet.height;
+        p.vertex(droplet.cx + halfWidthAt(y), y);
+      }
+      p.endShape(p.CLOSE);
     }
 
-    function resetComposition() {
-      drops.forEach((drop) => { drop.dead = true; });
-      splashes.forEach((particle) => { particle.dead = true; });
-      surface.resize();
-      createDrop(p.width * 0.36, -90, { fast: true, size: settings().size * 1.08 });
-      createDrop(p.width * 0.55, -220, { fast: true });
-      createDrop(p.width * 0.72, -340, { fast: true, size: settings().size * 0.92 });
-      createDrop(p.width * 0.48, p.height * 0.2, { fast: true });
-      startTime = p.millis();
-    }
+    function drawCharacters() {
+      p.textFont('"Noto Serif SC", "Songti SC", "SimSun", serif');
+      p.textAlign(p.CENTER, p.CENTER);
+      p.noStroke();
+      points.forEach((point) => {
+        const below = Math.max(0, point.y - surfaceY);
+        const melt = Math.min(1, below / 90);
+        p.push();
+        p.translate(point.x, point.y);
+        p.rotate((point.x - point.oldX) * 0.035);
+        p.scale(1 + melt * 0.75, 1 - melt * 0.45);
+        p.fill(melt > 0 ? "#2f8f9a" : "#171614");
+        p.textSize(fontSize * (1 - melt * 0.22));
+        p.text(point.char, 0, 0);
+        p.pop();
 
-    function setRunning(next) {
-      running = next;
-      controls.pause.textContent = running ? "Pause" : "Play";
-      if (running) p.loop();
-      else p.noLoop();
-    }
-
-    function pointerAction(x, y) {
-      if (y < surface.y - 18) createDrop(x, y - 20, { fast: true });
-      else createSplash(x, surface.y + surface.displacementAt(x), 1.2);
+        if (melt > 0.05) {
+          p.fill(47, 143, 154, 34 * melt);
+          p.ellipse(point.x, surfaceY + below * 0.18, fontSize * (0.8 + melt), 4 + melt * 8);
+        }
+      });
     }
 
     p.setup = () => {
-      const canvas = p.createCanvas(window.innerWidth, window.innerHeight);
-      canvas.parent(host);
+      const side = sizeCanvas();
+      const canvas = p.createCanvas(side, side);
+      canvas.parent(container);
       p.pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
-      p.frameRate(60);
-      p.textFont("Noto Serif SC, Source Han Serif SC, Songti SC, SimSun, serif");
-      surface = new LiquidSurface(p);
-      lastTime = p.millis();
-      resetComposition();
-      sketchApi = { rain, resetComposition, setRunning };
+      buildMesh();
     };
 
     p.draw = () => {
-      const config = settings();
-      const now = p.millis();
-      const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
-      lastTime = now;
-      const active = drops.filter((drop) => !drop.dead).length;
-
-      p.background(config.palette.text === "#151412" ? "#f3eee2" : "#efe8da");
+      p.background("#f6f1e8");
       p.noStroke();
-      p.fill(255, 255, 255, 18);
+      p.fill(255, 255, 255, 22);
       p.rect(0, 0, p.width, p.height);
 
-      spawnClock += dt * config.frequency;
-      if (spawnClock > 1 && active < config.maxDrops) {
-        spawnClock = 0;
-        createDrop();
-      }
-
-      surface.update(dt);
-      drops.forEach((drop) => {
-        drop.update(dt, config, (impactDrop) => {
-          lastState = "LIQUID";
-          createSplash(impactDrop.x, surface.y + surface.displacementAt(impactDrop.x), 1);
-        });
-      });
-      splashes.forEach((particle) => particle.update(dt, config.gravity));
-
-      drawAnnotations(config);
-      surface.draw(config.palette);
-      splashes.forEach((particle) => particle.draw(p));
-      drops.forEach((drop) => drop.draw(p, config.palette));
-
-      if (now % 220 < 18) {
-        status.count.textContent = String(active);
-        status.state.textContent = active ? lastState : "REST";
-        const elapsed = Math.floor((now - startTime) / 1000);
-        status.time.textContent = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
-      }
-      if (lastState === "LIQUID" && p.frameCount % 90 === 0) lastState = "FALLING";
-    };
-
-    function drawAnnotations(config) {
-      p.push();
-      p.textFont("Noto Serif SC, Source Han Serif SC, SimSun, serif");
-      p.textSize(11);
-      p.fill(config.palette.accent + "66");
-      p.noStroke();
-      p.textAlign(p.RIGHT, p.CENTER);
-      p.text("y = " + Math.round(surface.y), p.width - 24, surface.y - 18);
-      p.stroke(config.palette.accent + "24");
-      p.strokeWeight(1);
-      p.line(p.width - 110, surface.y - 14, p.width - 28, surface.y - 14);
-      p.pop();
-    }
-
-    p.windowResized = () => {
-      p.resizeCanvas(window.innerWidth, window.innerHeight);
-      p.pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
-      surface.resize();
-    };
-
-    p.mouseMoved = () => {
       if (p.mouseX >= 0 && p.mouseX <= p.width && p.mouseY >= 0 && p.mouseY <= p.height) {
-        const config = settings();
-        surface.disturb(p.mouseX, (p.mouseY - surface.y) * 0.018 * config.ripple);
+        applyPointerForce(p.mouseX, p.mouseY, CONFIG.pullRadius, p.mouseIsPressed ? 1.8 : 0.34);
       }
+
+      points.forEach((point) => point.update());
+      for (let i = 0; i < CONFIG.iterations; i += 1) links.forEach((link) => link.solve());
+      points.forEach(clampToDroplet);
+
+      drawDropletGuide();
+      drawSurface();
+      drawCharacters();
+
+      p.fill("#6a655d");
+      p.textSize(10);
+      p.textAlign(p.LEFT, p.BOTTOM);
+      resetHitArea = { x: 14, y: p.height - 28, w: 34, h: 18 };
+      p.text("reset", resetHitArea.x, p.height - 14);
     };
 
-    p.mousePressed = (event) => {
-      if (event.target.closest(".control-shell")) return;
-      pointerAction(p.mouseX, p.mouseY);
-      return false;
-    };
-
-    p.touchStarted = (event) => {
-      if (event.target.closest(".control-shell")) return true;
-      const touch = p.touches[0];
-      if (touch) pointerAction(touch.x, touch.y);
-      return false;
-    };
-
-    p.keyPressed = () => {
-      const tag = document.activeElement?.tagName;
-      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
-      if (p.key === " ") {
-        rain(14);
+    p.mousePressed = () => {
+      if (
+        p.mouseX >= resetHitArea.x &&
+        p.mouseX <= resetHitArea.x + resetHitArea.w &&
+        p.mouseY >= resetHitArea.y &&
+        p.mouseY <= resetHitArea.y + resetHitArea.h
+      ) {
+        buildMesh();
         return false;
       }
-      if (p.key === "r" || p.key === "R") resetComposition();
-      if (p.key === "p" || p.key === "P") setRunning(!running);
-      if (p.key === "s" || p.key === "S") p.saveCanvas("zi-luo-cheng-di", "png");
+      grabbed = nearestPoint(p.mouseX, p.mouseY);
+      if (grabbed) {
+        grabbed.pinned = true;
+        grabbed.x = p.mouseX;
+        grabbed.y = p.mouseY;
+        grabbed.oldX = p.mouseX;
+        grabbed.oldY = p.mouseY;
+      } else {
+        applyPointerForce(p.mouseX, p.mouseY, CONFIG.clickRadius, 6);
+      }
+      return false;
     };
 
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden && running) {
-        hiddenPause = true;
-        p.noLoop();
-      } else if (!document.hidden && hiddenPause) {
-        hiddenPause = false;
-        lastTime = p.millis();
-        p.loop();
-      }
-    });
-  });
+    p.mouseDragged = () => {
+      if (!grabbed) return false;
+      grabbed.x = p.mouseX;
+      grabbed.y = p.mouseY;
+      grabbed.oldX = p.mouseX;
+      grabbed.oldY = p.mouseY;
+      return false;
+    };
 
-  controls.pause.addEventListener("click", () => sketchApi?.setRunning(controls.pause.textContent !== "Pause"));
-  controls.reset.addEventListener("click", () => sketchApi?.resetComposition());
-  controls.rain.addEventListener("click", () => sketchApi?.rain(12));
-  controls.save.addEventListener("click", () => {
-    const canvas = host.querySelector("canvas");
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = "zi-luo-cheng-di.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  });
-  controls.panelToggle.addEventListener("click", () => {
-    const collapsed = controls.panel.classList.toggle("is-collapsed");
-    controls.panelToggle.setAttribute("aria-expanded", String(!collapsed));
-  });
-  controls.phrase.addEventListener("input", () => {
-    const clean = Array.from(controls.phrase.value)
-      .filter((char) => /[\u3400-\u9fff]/u.test(char))
-      .slice(0, 24)
-      .join("");
-    if (controls.phrase.value !== clean) controls.phrase.value = clean;
+    p.mouseReleased = () => {
+      if (grabbed) grabbed.pinned = grabbed.homeY === points[0].homeY;
+      grabbed = null;
+    };
+
+    p.touchStarted = () => p.mousePressed();
+    p.touchMoved = () => p.mouseDragged();
+    p.touchEnded = () => p.mouseReleased();
+
+    p.keyPressed = () => {
+      if (p.key === "r" || p.key === "R") buildMesh();
+      if (p.key === " ") applyPointerForce(p.width / 2, p.height / 2, p.width, 4.5);
+    };
+
+    p.windowResized = () => {
+      const side = sizeCanvas();
+      p.resizeCanvas(side, side);
+      buildMesh();
+    };
   });
 })();

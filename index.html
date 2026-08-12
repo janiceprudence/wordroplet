@@ -2,132 +2,14 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta
-      name="description"
-      content="字落成滴 is a full-screen p5.js generative typography piece where Chinese characters fall, cross a liquid threshold, and become droplets."
-    />
-    <title>字落成滴 / Characters Become Droplets</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>字落成滴</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="experience" aria-labelledby="project-title">
-      <canvas-fallback>
-        This artwork needs JavaScript and canvas support. Enable JavaScript to view the generative typography.
-      </canvas-fallback>
-
-      <div id="canvas-host" class="canvas-host" aria-hidden="true"></div>
-
-      <section class="title-block" aria-describedby="project-description">
-        <p class="kicker">GENERATIVE TYPOGRAPHY STUDY / 2026</p>
-        <h1 id="project-title">字落成滴</h1>
-        <p class="english-title">Characters Become Droplets</p>
-        <p id="project-description">
-          文字落下，越過邊界，化為流動。<br />
-          <span>When language crosses the boundary, it becomes liquid.</span>
-        </p>
-      </section>
-
-      <aside class="status-panel" aria-label="Live composition status">
-        <p><span>狀態</span><strong id="status-state">FALLING</strong></p>
-        <p><span>字數</span><strong id="status-count">0</strong></p>
-        <p><span>時間</span><strong id="status-time">00:00</strong></p>
-      </aside>
-
-      <p class="surface-label" aria-hidden="true">液面 / LIQUID THRESHOLD</p>
-      <p class="instruction">點擊釋放文字 / Tap to release a character. Space releases rain.</p>
-
-      <section class="control-shell is-collapsed" aria-label="Typography controls">
-        <button
-          class="panel-toggle"
-          id="panel-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="control-panel"
-        >
-          控制
-        </button>
-
-        <div class="control-panel" id="control-panel">
-          <div class="panel-header">
-            <p>參數 / PARAMETERS</p>
-            <button id="pause-button" type="button">Pause</button>
-          </div>
-
-          <label>
-            Gravity
-            <input id="gravity-control" type="range" min="120" max="900" value="420" step="10" />
-          </label>
-
-          <label>
-            Character frequency
-            <input id="frequency-control" type="range" min="0" max="1.4" value="0.45" step="0.05" />
-          </label>
-
-          <label>
-            Character size
-            <input id="size-control" type="range" min="44" max="150" value="96" step="2" />
-          </label>
-
-          <label>
-            Elasticity
-            <input id="bounce-control" type="range" min="0.08" max="0.86" value="0.42" step="0.02" />
-          </label>
-
-          <label>
-            Deformation
-            <input id="deform-control" type="range" min="0.2" max="1.5" value="0.9" step="0.05" />
-          </label>
-
-          <label>
-            Horizontal drift
-            <input id="drift-control" type="range" min="0" max="120" value="42" step="2" />
-          </label>
-
-          <label>
-            Ripple strength
-            <input id="ripple-control" type="range" min="0.1" max="1.8" value="0.95" step="0.05" />
-          </label>
-
-          <label>
-            Color mode
-            <select id="color-control">
-              <option value="ink">Ink / 墨</option>
-              <option value="cinnabar">Cinnabar / 朱</option>
-              <option value="jade">Jade / 玉</option>
-              <option value="blue">Electric blue / 電藍</option>
-            </select>
-          </label>
-
-          <label>
-            自訂短句
-            <input
-              id="phrase-input"
-              type="text"
-              maxlength="24"
-              value="水滴石穿"
-              aria-describedby="phrase-help"
-              autocomplete="off"
-            />
-          </label>
-          <p id="phrase-help" class="field-help">Only Chinese characters are used for falling particles.</p>
-
-          <div class="button-row">
-            <button id="rain-button" type="button">Rain</button>
-            <button id="reset-button" type="button">Reset</button>
-            <button id="save-button" type="button">Save</button>
-          </div>
-        </div>
-      </section>
-    </main>
+    <div id="container" aria-label="Interactive Chinese typography canvas"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script>
-    <script src="app.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>
