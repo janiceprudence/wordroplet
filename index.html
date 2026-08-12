@@ -13,34 +13,73 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="hero-panel" aria-labelledby="app-title">
-        <div class="brand-row">
-          <img class="wordmark-image" src="assets/postie-wordmark.png" alt="Postie" />
-          <p class="parcel-meta">Strawberry Mail</p>
-        </div>
+    <main class="scroll-world" id="top">
+      <div class="sticky-stage" aria-live="polite">
+        <header class="topbar">
+          <a class="brand-lockup" href="#top" aria-label="Postie home">
+            <img class="wordmark-image" src="assets/postie-wordmark.png" alt="" />
+            <span>Strawberry Mail</span>
+          </a>
+          <nav class="route-nav" aria-label="Delivery route">
+            <button type="button" data-jump="0">Record</button>
+            <button type="button" data-jump="1">Wrap</button>
+            <button type="button" data-jump="2">Send</button>
+            <button type="button" data-jump="3">Arrive</button>
+            <button type="button" data-jump="4">Open</button>
+            <button type="button" data-jump="5">Reply</button>
+          </nav>
+        </header>
 
-        <div class="mail-stage" aria-live="polite">
-          <div class="sky-window">
-            <div class="dream-grid"></div>
-            <div class="cloud cloud-one"></div>
-            <div class="cloud cloud-two"></div>
-            <div class="glass-mailbox" id="mailbox">
-              <span class="mailbox-flag" aria-hidden="true"></span>
-              <span class="mailbox-screen">New parcel</span>
+        <div class="three-world" id="three-world" aria-hidden="true"></div>
+
+        <div class="sky-world" aria-hidden="true">
+          <div class="sun"></div>
+          <div class="cloud cloud-one"></div>
+          <div class="cloud cloud-two"></div>
+          <div class="route-line"></div>
+          <div class="mail-camera" id="mail-camera">
+            <div class="glass-mailbox">
+              <span class="mailbox-flag"></span>
+              <span class="mailbox-screen" id="mailbox-screen">Listening</span>
               <span class="mailbox-slot"></span>
             </div>
-          </div>
-          <div class="stage-copy">
-            <h1 id="app-title" class="brand-wordmark">Postie</h1>
-            <p class="parcel-status" id="stage-status">
-              There is something soft waiting in your mailbox.
-            </p>
+            <div class="mini-parcel" id="mini-parcel">
+              <span></span>
+            </div>
+            <div class="paper-heart"></div>
           </div>
         </div>
-      </section>
 
-      <section class="workspace" aria-label="Postie app">
+        <section class="copy-layer" aria-labelledby="scene-title">
+          <p class="parcel-meta" id="scene-count">01 / 06</p>
+          <h1 class="brand-wordmark" id="scene-title">Postie</h1>
+          <p class="parcel-title" id="scene-subtitle">Record a feeling like a tiny parcel.</p>
+          <p class="parcel-body" id="scene-body">
+            Hold to record, add a label, and send it through a soft little postal route.
+          </p>
+        </section>
+
+        <div class="scene-strip" aria-hidden="true">
+          <figure class="scene-card is-active">
+            <img src="mood references/preview-04-o.avif" alt="" />
+          </figure>
+          <figure class="scene-card">
+            <img src="mood references/8a39c11b13e725e197139d8c31e06e8a.jpg" alt="" />
+          </figure>
+          <figure class="scene-card">
+            <img src="mailbox visual style/1.jpg" alt="" />
+          </figure>
+        </div>
+
+        <div class="scroll-hint" id="scroll-hint">
+          <span>scroll to deliver</span>
+          <i></i>
+        </div>
+      </div>
+
+      <div class="scroll-track" aria-hidden="true"></div>
+
+      <section class="workspace" aria-label="Open the delivered parcel">
         <div class="panel-heading">
           <p class="parcel-meta">Special delivery from Sam</p>
           <h2 class="parcel-title" id="flow-title">A little world, folded just for you.</h2>
@@ -49,45 +88,13 @@
 
         <div class="parcel-theater" id="parcel-theater">
           <div class="parcel-scene" id="parcel-scene">
-            <div class="paper-flap paper-flap-top" aria-hidden="true">
-              <span class="paper-crease"></span>
-            </div>
-            <div class="paper-flap paper-flap-right" aria-hidden="true">
-              <span class="paper-crease"></span>
-            </div>
-            <div class="paper-flap paper-flap-bottom" aria-hidden="true">
-              <span class="paper-crease"></span>
-            </div>
-            <div class="paper-flap paper-flap-left" aria-hidden="true">
-              <span class="paper-crease"></span>
-            </div>
+            <div class="paper-flap paper-flap-top" aria-hidden="true"><span class="paper-crease"></span></div>
+            <div class="paper-flap paper-flap-right" aria-hidden="true"><span class="paper-crease"></span></div>
+            <div class="paper-flap paper-flap-bottom" aria-hidden="true"><span class="paper-crease"></span></div>
+            <div class="paper-flap paper-flap-left" aria-hidden="true"><span class="paper-crease"></span></div>
 
             <div class="parcel-reveal" id="parcel-reveal" aria-hidden="true">
-              <svg
-                class="dream-landscape"
-                viewBox="0 0 400 260"
-                role="img"
-                aria-labelledby="dream-title dream-desc"
-                preserveAspectRatio="xMidYMid slice"
-              >
-                <title id="dream-title">A dream meadow at sunset</title>
-                <desc id="dream-desc">A flower-filled train opens onto a glowing dream landscape.</desc>
-                <defs>
-                  <clipPath id="dream-clip">
-                    <path id="dream-mask" d="M194 126 H206 V134 H194 Z" />
-                  </clipPath>
-                  <path id="mask-closed" d="M194 126 H206 V134 H194 Z" />
-                  <path id="mask-open" d="M16 16 Q16 4 28 4 H372 Q384 4 384 16 V244 Q384 256 372 256 H28 Q16 256 16 244 Z" />
-                </defs>
-                <image
-                  href="mood references/8a39c11b13e725e197139d8c31e06e8a.jpg"
-                  width="400"
-                  height="260"
-                  preserveAspectRatio="xMidYMid slice"
-                  clip-path="url(#dream-clip)"
-                />
-              </svg>
-
+              <img class="dream-landscape" src="mood references/8a39c11b13e725e197139d8c31e06e8a.jpg" alt="A glowing flower field at sunset" />
               <div class="voice-note" id="voice-note">
                 <button class="play-button" id="play-button" type="button" aria-label="Play voice message">
                   <span class="play-icon" aria-hidden="true"></span>
@@ -104,13 +111,7 @@
               </div>
             </div>
 
-            <button
-              class="parcel-lid paper-texture"
-              id="parcel-button"
-              type="button"
-              aria-expanded="false"
-              aria-controls="parcel-reveal"
-            >
+            <button class="parcel-lid paper-texture" id="parcel-button" type="button" aria-expanded="false" aria-controls="parcel-reveal">
               <span class="packing-tape" aria-hidden="true"></span>
               <span class="address-label">
                 <span class="parcel-meta">For June</span>
@@ -126,12 +127,21 @@
           <p class="parcel-status" id="flow-status" aria-live="polite">
             Paper parcel. Packed 12 minutes ago.
           </p>
-          <button class="fold-button" id="fold-button" type="button" hidden>Fold it closed</button>
+          <div class="footer-actions">
+            <button class="fold-button" id="fold-button" type="button" hidden>Fold it closed</button>
+            <button class="reaction-button" id="reaction-button" type="button" hidden>Send a little reply</button>
+          </div>
         </div>
       </section>
     </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js"
+        }
+      }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/gsap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15/dist/MorphSVGPlugin.min.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
